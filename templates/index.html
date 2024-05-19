@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RepurposeAI - Content Editor</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <header>
+        <div class="logo">RepurposeAI</div>
+    </header>
+
+    <main>
+        <div class="editor-container">
+            <h1 class="editor-title">Content Editor</h1>
+            <form id="contentForm" method="post" action="/fetch">
+                <input type="text" name="url" id="substackUrl" placeholder="Enter Substack URL" required>
+                <button type="submit">Fetch Substack Post</button>
+            </form>
+            <textarea id="inputContent" class="textarea-container" placeholder="Fetched Substack post content will appear here..." readonly></textarea>
+            <form id="generateForm" method="post" action="/generate">
+                <select name="platform" id="platformSelect">
+                    <option value="linkedin">LinkedIn</option>
+                    <option value="twitter">Twitter</option>
+                </select>
+                <input type="hidden" name="content" id="hiddenContent">
+                <button type="submit">Generate Result</button>
+            </form>
+            <div id="resultContainer" style="display: none;">
+                <h2 class="editor-title">Edit Your Result</h2>
+                <textarea id="resultEditor" class="editor"></textarea>
+                <button type="button" onclick="postToSocialMedia()">Post to Social Media</button>
+            </div>
+            <div id="errorContainer" class="error" style="display: none;"></div>
+        </div>
+    </main>
+
+    <!-- Include CKEditor JavaScript -->
+    <script src="https://cdn.ckeditor.com/4.16.2/standard/ckeditor.js"></script>
+    
+    <script>
+        // Initialize CKEditor for result editor
+        CKEDITOR.replace('resultEditor');
+
+        document.getElementById('contentForm').onsubmit = async function (event) {
+            event.preventDefault();
+            const url = document.getElementById('substackUrl').value;
+            const inputContent = document.getElementById('inputContent');
+            const errorContainer = document.getElementById('errorContainer');
+            errorContainer.style.display = 'none'; // Hide error container initially
+
+            try {
+                const response = await fetch('/fetch', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams({
+                        'url': url
+                    })
+                });
+
+                const data = await response.json();
+                if (data.content) {
+                    inputContent.value = data.content;
+                    document.getElementById('hiddenContent').value = data.content;
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                console.error('Error fetching Substack post:', error);
+                errorContainer.textContent = `Error: ${error.message}`;
+                errorContainer.style.display = 'block'; // Show error container
+            }
+        };
+
+        document.getElementById('generateForm').onsubmit = async function (event) {
+            event.preventDefault();
+            const inputContent = document.getElementById('inputContent').value;
+            const platform = document.getElementById('platformSelect').value;
+            const errorContainer = document.getElementById('errorContainer');
+            errorContainer.style.display = 'none'; // Hide error container initially
+
+            try {
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams({
+                        'platform': platform,
+                        'content': inputContent
+                    })
+                });
+
+                const data = await response.json();
+                if (data.result_content) {
+                    CKEDITOR.instances.resultEditor.setData(data.result_content);
+                    document.getElementById('resultContainer').style.display = 'block';
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                console.error('Error generating result:', error);
+                errorContainer.textContent = `Error: ${error.message}`;
+                errorContainer.style.display = 'block'; // Show error container
+            }
+        };
+
+        async function postToSocialMedia() {
+            const content = CKEDITOR.instances.resultEditor.getData();
+            const platform = document.getElementById('platformSelect').value;
+
+            try {
+                const response = await fetch('/post', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams({
+                        'platform': platform,
+                        'content': content
+                    })
+                });
+
+                const data = await response.json();
+                if (data.message) {
+                    alert(data.message);
+                } else {
+                    throw new Error('Error posting to social media');
+                }
+            } catch (error) {
+                console.error('Error posting to social media:', error);
+                alert('Failed to post content to social media.');
+            }
+        }
+    </script>
+</body>
+</html>
